@@ -23,14 +23,17 @@ export abstract class ProtocolBridgeController<CONN, ID> {
     const responseTopic: string = this.getResponseTopic(ctx)
     this.bridgeLogger.debug(`Response topic: ${responseTopic}`)
 
+    const timestamp: number = Date.now()
+
     try {
       const response = await firstValueFrom(this.protocolService.read(connection, req))
-      this.sendResponse(responseTopic, response)
+      this.sendReadResponse(responseTopic, response, timestamp)
     } catch (err) {
       this.bridgeLogger.error(err.toString())
       this.sendError(
         responseTopic,
-        (process.env.NODE_ENV || 'development') ? err.toString() : `Internal ${this.protocolService.getProtocolName()} protocol bridge reading error`
+        (process.env.NODE_ENV || 'development') ? err.toString() : `Internal ${this.protocolService.getProtocolName()} protocol bridge reading error`,
+        timestamp
       )
       throw err
     }
@@ -42,14 +45,17 @@ export abstract class ProtocolBridgeController<CONN, ID> {
     const responseTopic: string = this.getResponseTopic(ctx, false)
     this.bridgeLogger.debug(`Response topic: ${responseTopic}`)
 
+    const timestamp: number = Date.now()
+
     try {
       const response = await firstValueFrom(this.protocolService.write(connection, req))
-      if (responseTopic) this.sendResponse(responseTopic, response)
+      if (responseTopic) this.sendWriteResponse(responseTopic, timestamp)
     } catch (err: any) {
       this.bridgeLogger.error(err.toString())
       this.sendError(
         responseTopic,
-        (process.env.NODE_ENV || 'development') ? err.toString() : `Internal ${this.protocolService.getProtocolName()} protocol bridge writing error`
+        (process.env.NODE_ENV || 'development') ? err.toString() : `Internal ${this.protocolService.getProtocolName()} protocol bridge writing error`,
+        timestamp
       )
       throw err
     }
@@ -69,7 +75,11 @@ export abstract class ProtocolBridgeController<CONN, ID> {
     return responseTopic
   }
 
-  private sendResponse(topic: string, payload: any) {
+  private sendReadResponse(topic: string, values: any[], timestamp: number) {
+    const payload: any = {
+      timestamp,
+      values
+    }
     const record = this.mqttBuilder
       .setData(payload)
       .setQoS(0)
@@ -78,11 +88,27 @@ export abstract class ProtocolBridgeController<CONN, ID> {
     this.mqttService.client.emit(topic, record)
   }
 
-  private sendError(topic: string, error: string) {
+  private sendWriteResponse(topic: string, timestamp: number) {
+    const payload: any = {
+      timestamp
+    }
     const record = this.mqttBuilder
-      .setData({ error })
+      .setData(payload)
       .setQoS(0)
       .setRetain(true)
+      .build()
+    this.mqttService.client.emit(topic, record)
+  }
+
+  private sendError(topic: string, message: string, timestamp: number) {
+    const payload: any = {
+      timestamp,
+      message
+    }
+    const record = this.mqttBuilder
+      .setData(payload)
+      .setQoS(0)
+      .setRetain(false)
       .build()
     this.mqttService.client.emit(`${topic}/errors`, record)
   }
