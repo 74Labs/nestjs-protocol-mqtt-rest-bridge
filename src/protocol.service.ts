@@ -1,5 +1,5 @@
 import { Logger, OnModuleDestroy } from "@nestjs/common";
-import { catchError, map, Observable } from "rxjs";
+import { catchError, Observable } from "rxjs";
 
 interface ProcotolConnection<CONN> {
   name: string,
