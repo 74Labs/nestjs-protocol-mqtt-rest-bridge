@@ -76,10 +76,9 @@ export abstract class ProtocolBridgeController<CONN, ID> {
   }
 
   private sendReadResponse(topic: string, values: any[], timestamp: number) {
-    const payload: any = {
-      timestamp,
-      values
-    }
+    this.bridgeLogger.verbose(`Values ${JSON.stringify(values)}`)
+    const payload: any[] = values.map(v => { return { ...{ timestamp }, ...{ value: v } } })
+    this.bridgeLogger.verbose(`Sending: ${JSON.stringify(payload)}`)
     const record = this.mqttBuilder
       .setData(payload)
       .setQoS(0)
